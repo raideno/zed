@@ -52,6 +52,8 @@ actions!(
         RunAll,
         /// Runs the current cell.
         Run,
+        /// Runs the current cell and advances to the next one, creating a new cell if at the end.
+        RunAndAdvance,
         /// Clears all cell outputs.
         ClearOutputs,
         /// Moves the current cell up.
@@ -605,8 +607,42 @@ impl NotebookEditor {
                             markdown_cell.update(cx, |cell, cx| {
                                 cell.run(cx);
                             });
-                            // move to the next cell
-                            // Discussion can be done on this default implementation
+                        }
+                    }
+                    Cell::Raw(_) => {}
+                }
+            }
+        }
+    }
+
+    fn run_current_cell_and_advance(
+        &mut self,
+        _: &RunAndAdvance,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(cell_id) = self.cell_order.get(self.selected_cell_index).cloned() {
+            if let Some(cell) = self.cell_map.get(&cell_id) {
+                let is_last_cell = self.selected_cell_index == self.cell_order.len() - 1;
+                match cell {
+                    Cell::Code(_) => {
+                        self.execute_cell(cell_id, cx);
+                        if is_last_cell {
+                            self.add_code_block(window, cx);
+                        } else {
+                            self.move_to_next_cell(window, cx);
+                        }
+                    }
+                    Cell::Markdown(markdown_cell) => {
+                        let is_editing = markdown_cell.read(cx).is_editing();
+                        if is_editing {
+                            markdown_cell.update(cx, |cell, cx| {
+                                cell.run(cx);
+                            });
+                        }
+                        if is_last_cell {
+                            self.add_markdown_block(window, cx);
+                        } else {
                             self.move_to_next_cell(window, cx);
                         }
                     }
@@ -1264,6 +1300,9 @@ impl Render for NotebookEditor {
             .on_action(
                 cx.listener(|this, _: &Run, window, cx| this.run_current_cell(&Run, window, cx)),
             )
+            .on_action(cx.listener(|this, _: &RunAndAdvance, window, cx| {
+                this.run_current_cell_and_advance(&RunAndAdvance, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &RunAll, window, cx| this.run_cells(window, cx)))
             .on_action(
                 cx.listener(|this, _: &MoveCellUp, window, cx| this.move_cell_up(window, cx)),
