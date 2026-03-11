@@ -397,6 +397,9 @@ impl NotebookEditor {
         let view = cx.entity();
 
         self.kernel_specification = Some(spec.clone());
+        ReplStore::global(cx).update(cx, |store, cx| {
+            store.set_active_kernelspec(self.worktree_id, spec.clone(), cx);
+        });
 
         self.notebook_item.update(cx, |item, cx| {
             let kernel_name = spec.name().to_string();
